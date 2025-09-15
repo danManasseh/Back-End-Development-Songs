@@ -2,7 +2,7 @@ from . import app
 import os
 import json
 import pymongo
-from flask import jsonify, request, make_response, abort, url_for  # noqa; F401
+from flask import jsonify, request, make_response, abort, url_for, Response  # noqa; F401
 from pymongo import MongoClient
 from bson import json_util
 from pymongo.errors import OperationFailure
@@ -51,3 +51,26 @@ def parse_json(data):
 ######################################################################
 # INSERT CODE HERE
 ######################################################################
+
+@app.route('/health')
+def health():
+    return jsonify(dict(status = "OK")), 200
+
+@app.route('/count')
+def count():
+    if songs_list:
+        return jsonify(count = len(songs_list)), 200
+    return {"message":"Internal server error"}, 500
+
+
+@app.route('/song') 
+def songs(): 
+    try:
+        all_songs = db.songs.find({})
+        return Response(
+            json_util.dumps({"songs": list(all_songs)}),
+            mimetype="application/json",
+            status=200
+        )
+    except Exception as e:
+        return {"message": e}, 500
