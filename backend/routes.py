@@ -58,12 +58,14 @@ def health():
 
 @app.route('/count')
 def count():
-    if songs_list:
-        return jsonify(count = len(songs_list)), 200
-    return {"message":"Internal server error"}, 500
+    try:
+        count = db.songs.count_documents({})
+        return {"count": count}, 200
+    except Exception as e:
+        return {"message":"Internal Server Error!"}, 500
 
 
-@app.route('/song') 
+@app.route('/song', methods=['GET']) 
 def songs(): 
     try:
         all_songs = db.songs.find({})
@@ -74,3 +76,68 @@ def songs():
         )
     except Exception as e:
         return {"message": e}, 500
+
+
+@app.route('/song/<int:song_id>', methods=['GET'])
+def get_song_by_id(song_id):
+    try:
+        song = db.songs.find_one({"id":song_id})
+        if song:
+            return Response(
+                json_util.dumps(song),
+                mimetype= "application/json",
+                status=200
+            )
+        return {"message": f"song with id {song_id} not found"}, 404
+    except Exception as e:
+        return {"message":"Internal Server Error!"}, 500
+
+
+@app.route('/song', methods= ['POST'])
+def create_song():
+    try:
+        new_song = request.get_json()
+        existing_song = db.songs.find_one({"id": new_song['id']})
+        if existing_song:
+            return {"Message": f"song witih id {new_song['id']} already present"}, 302
+        result = db.songs.insert_one(new_song)
+        return Response(
+            json_util.dumps({"inserted id": result.inserted_id}),
+            mimetype="application/json",
+            status=201
+        )
+    except Exception as e:
+        return {"message":"Internal Server Error"}, 500
+
+
+
+@app.route('/song/<int:song_id>', methods=['PUT'])
+def update_song(song_id):
+    try:
+        song_data = request.get_json()
+        result = db.songs.update_one(
+            {"id": song_id}, {"$set":song_data}
+        )
+        if result.matched_count == 0:
+            return {"message":f"song with id {song_id} not found"}, 404
+        if result.modified_count == 0:
+            return {"message":"song found, but nothing updated"}, 200
+        updated_song = db.songs.find_one({"id":song_id})
+        return Response(
+            json_util.dumps(updated_song),
+            mimetype="application/json",
+            status=201
+        )
+    except Exception as e:
+        return {"message":{str(e)}}, 500
+
+@app.route('/song/<int:song_id>', methods=['DELETE'])
+def delete_song(song_id):
+    try:
+        result = db.songs.delete_one({"id": song_id})
+
+        if result.deleted_count == 0:
+            return {"message":"song not found"}, 404
+        return "", 204
+    except Exception as e:
+        return {"message": "Internal Server Error"}, 500
